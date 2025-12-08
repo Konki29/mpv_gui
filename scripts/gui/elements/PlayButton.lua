@@ -10,37 +10,41 @@ end
 
 function PlayButton:handle_input(event, x, y)
     if event == "down" then
-        -- Hitbox específico para el botón Play/Pause
-        local icon_y = self.state.h - self.opts.box_height / 2
-        local icon_x = 20
-        local hitbox_radius = 25 -- Área de clic generosa pero específica
+        -- Hitbox específico para el botón Play/Pause (centrado)
+        local icon_y = self.state.h - self.opts.controls_row_offset
+        local icon_x = self.state.w / 2  -- Centrado
+        local hitbox_radius = 30
         
-        -- También verificar que estamos en el área del control box (Y)
+        -- Verificar que estamos en el área del control box (Y)
         local box_top = self.state.h - self.opts.box_height
         
-        if y >= box_top and x <= (icon_x + hitbox_radius) and math.abs(y - icon_y) < hitbox_radius then
+        if y >= box_top and math.abs(x - icon_x) < hitbox_radius and math.abs(y - icon_y) < hitbox_radius then
             mp.command("cycle pause")
-            return true -- Consumir el evento
+            return true
         end
     end
     return false
 end
 
 function PlayButton:draw(ass)
-    local icon_y = self.state.h - self.opts.box_height / 2
-    local cur_x = 20
+    -- Fila inferior para controles, centrado horizontalmente
+    local icon_y = self.state.h - self.opts.controls_row_offset
+    local cur_x = self.state.w / 2  -- Centrado
     
     ass:new_event()
     ass:pos(cur_x, icon_y)
+    ass:an(5) -- Anchor center
     ass:append("{\\bord0\\shad0\\c&HFFFFFF&}")
     ass:draw_start()
     if self.state.paused then
-        ass:move_to(0, -10)
-        ass:line_to(15, 0)
-        ass:line_to(0, 10)
+        -- Triángulo de play centrado
+        ass:move_to(-8, -12)
+        ass:line_to(12, 0)
+        ass:line_to(-8, 12)
     else
-        ass:rect_cw(0, -10, 5, 10)
-        ass:rect_cw(10, -10, 15, 10)
+        -- Pause centrado
+        ass:rect_cw(-8, -10, -3, 10)
+        ass:rect_cw(3, -10, 8, 10)
     end
     ass:draw_stop()
 end
