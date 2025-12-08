@@ -13,7 +13,11 @@ local state = {
     
     -- LÓGICA MODERN.LUA: Variable para evitar comandos repetidos
     last_seek_pct = -1,
-    visual_seek_pct = -1 -- Para visualización suave durante el arrastre
+    visual_seek_pct = -1, -- Para visualización suave durante el arrastre
+    
+    -- Control de window-dragging
+    control_area_active = false, -- Si el mouse está actualmente en el área de controles
+    bg_dragging = false -- Si hubo un click down en el background
 }
 
 return state

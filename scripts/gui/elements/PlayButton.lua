@@ -10,32 +10,17 @@ end
 
 function PlayButton:handle_input(event, x, y)
     if event == "down" then
-        -- Simple zone check for play button area
-        -- In the original code it was "not seekbar", so general click area
-        -- Here we can be more specific or generic. 
-        -- Original logic: if x < 60 and bottom area -> pause. OR just general click toggle.
-        -- Let's stick to the visual area of the button for specificity 
-        -- OR follow the original logic which was looser.
-        
-        -- Let's make it specific to the icon area + padding
+        -- Hitbox específico para el botón Play/Pause
         local icon_y = self.state.h - self.opts.box_height / 2
         local icon_x = 20
-        local radius = 20
+        local hitbox_radius = 25 -- Área de clic generosa pero específica
         
-        if math.abs(x - icon_x) < radius and math.abs(y - icon_y) < radius then
-             mp.command("cycle pause")
-             return true
-        end
+        -- También verificar que estamos en el área del control box (Y)
+        local box_top = self.state.h - self.opts.box_height
         
-        -- Fallback: Original code had a loose "click anywhere else" policy?
-        -- Original code:
-        -- if state.mouse_x < 60 and state.mouse_y > (state.h - opts.box_height) then ... else cycle pause end
-        -- It seems clicking ANYWHERE not on the bar toggled pause.
-        
-        if y > (self.state.h - self.opts.box_height) then
-            -- Click in the control box area but not on specific buttons
-             mp.command("cycle pause")
-             return true
+        if y >= box_top and x <= (icon_x + hitbox_radius) and math.abs(y - icon_y) < hitbox_radius then
+            mp.command("cycle pause")
+            return true -- Consumir el evento
         end
     end
     return false

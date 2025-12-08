@@ -50,11 +50,13 @@ local function input_handler()
     -- Check for general activity
     state.user_activity = true
     
-    -- Dispatch move event to components
-    local consumed = false
-    for _, element in ipairs(elements) do
-        if element:handle_input("move", x, y) then
-            consumed = true
+    -- Primero: Background maneja el bloqueo de window-dragging (siempre se ejecuta)
+    elements[1]:handle_input("move", x, y) -- Background
+    
+    -- Dispatch move event to components (orden inverso para priorizar capas superiores)
+    for i = #elements, 2, -1 do
+        if elements[i]:handle_input("move", x, y) then
+            break -- Parar si un elemento consume el evento
         end
     end
     
