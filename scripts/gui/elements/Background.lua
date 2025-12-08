@@ -1,4 +1,4 @@
-local Element = require 'gui.elements.Element'
+local Element = require 'elements.Element'
 local Background = setmetatable({}, {__index = Element})
 Background.__index = Background
 

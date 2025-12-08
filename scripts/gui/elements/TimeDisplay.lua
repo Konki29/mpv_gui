@@ -1,4 +1,4 @@
-local Element = require 'gui.elements.Element'
+local Element = require 'elements.Element'
 local TimeDisplay = setmetatable({}, {__index = Element})
 TimeDisplay.__index = TimeDisplay
 

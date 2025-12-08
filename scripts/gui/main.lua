@@ -1,15 +1,19 @@
+-- 1. Setup Path (Portable)
+local script_path = debug.getinfo(1).source:match("@(.*[\\/])")
+package.path = script_path .. "?.lua;" .. package.path
+
 local mp = require 'mp'
 local assdraw = require 'mp.assdraw'
 
--- 1. Import Shared State & Config
-local state = require 'gui.state'
-local opts = require 'gui.config'
+-- 2. Import Shared State & Config
+local state = require 'state'
+local opts = require 'config'
 
--- 2. Import Components
-local Background = require 'gui.elements.Background'
-local ProgressBar = require 'gui.elements.ProgressBar'
-local PlayButton = require 'gui.elements.PlayButton'
-local TimeDisplay = require 'gui.elements.TimeDisplay'
+-- 3. Import Components
+local Background = require 'elements.Background'
+local ProgressBar = require 'elements.ProgressBar'
+local PlayButton = require 'elements.PlayButton'
+local TimeDisplay = require 'elements.TimeDisplay'
 
 -- 3. Initialize Components
 local elements = {

@@ -1,5 +1,5 @@
 local mp = require 'mp'
-local Element = require 'gui.elements.Element'
+local Element = require 'elements.Element'
 local PlayButton = setmetatable({}, {__index = Element})
 PlayButton.__index = PlayButton
 
