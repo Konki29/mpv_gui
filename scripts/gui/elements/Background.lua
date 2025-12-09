@@ -10,12 +10,39 @@ end
 
 function Background:draw(ass)
     local w, h = self.state.w, self.state.h
-    ass:new_event()
-    ass:append("{\\pos(0,0)\\r\\shad0\\bord0\\an7}")
-    ass:append("{\\c&H000000&\\alpha&H40&}")
-    ass:draw_start()
-    ass:rect_cw(0, h - self.opts.box_height, w, h)
-    ass:draw_stop()
+    local box_height = self.opts.box_height
+    
+    -- Gradiente profesional: 1 franja por cada 2 pixels para máxima suavidad
+    -- sin sacrificar demasiado rendimiento
+    local pixel_step = 2
+    local num_strips = math.floor(box_height / pixel_step)
+    
+    -- Opacidad: 00 = opaco, FF = transparente
+    local alpha_bottom = 0x20  -- Más oscuro abajo
+    local alpha_top = 0xFF     -- Transparente arriba
+    
+    for i = 0, num_strips - 1 do
+        -- t va de 0 (abajo) a 1 (arriba)
+        local t = i / num_strips
+        
+        -- Curva ease-out cuadrática: más cambio al principio, suave al final
+        -- Esto hace que el gradiente se desvanezca de forma más natural
+        local eased_t = 1 - (1 - t) * (1 - t)
+        
+        local alpha = math.floor(alpha_bottom + (alpha_top - alpha_bottom) * eased_t)
+        local alpha_hex = string.format("%02X", alpha)
+        
+        -- Posición: desde abajo hacia arriba
+        local strip_bottom = h - (i * pixel_step)
+        local strip_top = strip_bottom - pixel_step
+        
+        ass:new_event()
+        ass:append("{\\pos(0,0)\\r\\shad0\\bord0\\an7}")
+        ass:append("{\\c&H000000&\\alpha&H" .. alpha_hex .. "&}")
+        ass:draw_start()
+        ass:rect_cw(0, strip_top, w, strip_bottom)
+        ass:draw_stop()
+    end
 end
 
 -- Manejar input para bloquear el arrastre de ventana PREVENTIVAMENTE

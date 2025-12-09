@@ -14,9 +14,11 @@ local Background = require 'elements.Background'
 local ProgressBar = require 'elements.ProgressBar'
 local PlayButton = require 'elements.PlayButton'
 local TimeDisplay = require 'elements.TimeDisplay'
+local DropZone = require 'elements.DropZone'
 
 -- 3. Initialize Components
 local elements = {
+    DropZone.new(state, opts),    -- DropZone primero (capa inferior)
     Background.new(state, opts),
     ProgressBar.new(state, opts),
     PlayButton.new(state, opts),
@@ -28,6 +30,15 @@ local elements = {
 -- ============================================================================
 
 local function render() 
+    -- Siempre mostrar UI si no hay archivo (para mostrar DropZone)
+    if not state.has_file then
+        -- Renderizar solo DropZone cuando no hay archivo
+        local ass = require('mp.assdraw').ass_new()
+        elements[1]:draw(ass)  -- DropZone
+        mp.set_osd_ass(state.w, state.h, ass.text)
+        return
+    end
+    
     if not state.show_ui and not state.paused and not state.dragging then
         mp.set_osd_ass(state.w, state.h, "")
         return
@@ -107,6 +118,10 @@ mp.add_periodic_timer(0.05, function()
     state.duration = mp.get_property_number("duration", 0)
     state.position = mp.get_property_number("time-pos", 0)
     state.paused = mp.get_property_bool("pause", false)
+    
+    -- Detectar si hay un archivo cargado
+    local path = mp.get_property("path")
+    state.has_file = (path ~= nil and path ~= "")
     
     if state.show_ui or state.paused then
         render()

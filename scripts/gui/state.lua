@@ -10,6 +10,7 @@ local state = {
     position = 0,
     paused = false,
     user_activity = false,
+    has_file = false, -- Si hay un archivo cargado
     
     -- LÓGICA MODERN.LUA: Variable para evitar comandos repetidos
     last_seek_pct = -1,
