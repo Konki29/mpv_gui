@@ -16,6 +16,7 @@ local PlayButton = require 'elements.PlayButton'
 local SkipButtons = require 'elements.SkipButtons'
 local VolumeButton = require 'elements.VolumeButton'
 local TimeDisplay = require 'elements.TimeDisplay'
+local WindowControls = require 'elements.WindowControls'
 local DropZone = require 'elements.DropZone'
 local Subs = require 'elements.Subs'
 
@@ -25,19 +26,22 @@ local bg_elements = {
 }
 
 local ui_elements = {
-    ProgressBar.new(state, opts),   -- [1]
-    PlayButton.new(state, opts),    -- [2]
-    SkipButtons.new(state, opts),   -- [3]
-    VolumeButton.new(state, opts),  -- [4]
-    TimeDisplay.new(state, opts),   -- [5]
-    Subs.new(state, opts),          -- [6]
+    ProgressBar.new(state, opts),       -- [1]
+    PlayButton.new(state, opts),        -- [2]
+    SkipButtons.new(state, opts),       -- [3]
+    VolumeButton.new(state, opts),      -- [4]
+    TimeDisplay.new(state, opts),       -- [5]
+    WindowControls.new(state, opts),    -- [6]
+    Subs.new(state, opts),              -- [7]
 }
 
 local dropzone = DropZone.new(state, opts)
 
--- 5. Two separate OSD overlays
+-- 5. Two separate OSD overlays (z-order: lower = behind)
 local bg_overlay = mp.create_osd_overlay("ass-events")
+bg_overlay.z = 10
 local ui_overlay = mp.create_osd_overlay("ass-events")
+ui_overlay.z = 20
 
 -- ============================================================================
 -- RENDER
@@ -220,7 +224,7 @@ mp.add_periodic_timer(0.25, function()
             state.show_ui = true
             render()
         end
-    elseif (now - state.last_mouse_move > state.activity_timeout) 
+    elseif (now - state.last_mouse_move > opts.auto_hide_timeout) 
            and not state.hovering_bar and not state.paused and not state.dragging then
         if state.show_ui then
             state.show_ui = false
@@ -247,3 +251,32 @@ end)
 
 mp.add_key_binding("mouse_btn0", "mouse_btn0", mouse_handler, {complex=true})
 mp.add_key_binding("mouse_move", "mouse_move", input_handler, {complex=true})
+
+-- ============================================================================
+-- MOUSE WHEEL: Subtitle scroll OR volume control
+-- ============================================================================
+
+local function wheel_handler(direction)
+    -- Try dispatching scroll to UI elements (Subs menu first)
+    for i = #ui_elements, 1, -1 do
+        if ui_elements[i]:handle_input(direction, state.mouse_x, state.mouse_y) then
+            render_ui()
+            return
+        end
+    end
+    -- No element consumed it → volume control
+    if opts.mouse_wheel_volume then
+        if direction == "scroll_up" then
+            mp.command(string.format("no-osd add volume %d", opts.volume_step))
+        else
+            mp.command(string.format("no-osd add volume -%d", opts.volume_step))
+        end
+    end
+end
+
+mp.add_forced_key_binding("WHEEL_UP", "osc_wheel_up", function()
+    wheel_handler("scroll_up")
+end)
+mp.add_forced_key_binding("WHEEL_DOWN", "osc_wheel_down", function()
+    wheel_handler("scroll_down")
+end)

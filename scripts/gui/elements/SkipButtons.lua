@@ -23,14 +23,14 @@ function SkipButtons:handle_input(event, x, y)
     -- Backward
     local bx = cx - SKIP_OFFSET_X
     if math.abs(x - bx) < HITBOX_RADIUS and math.abs(y - cy) < HITBOX_RADIUS then
-        mp.commandv("seek", "-5", "relative", "exact")
+        mp.commandv("seek", tostring(-self.opts.seek_step), "relative", "exact")
         return true
     end
     
     -- Forward
     local fx = cx + SKIP_OFFSET_X
     if math.abs(x - fx) < HITBOX_RADIUS and math.abs(y - cy) < HITBOX_RADIUS then
-        mp.commandv("seek", "5", "relative", "exact")
+        mp.commandv("seek", tostring(self.opts.seek_step), "relative", "exact")
         return true
     end
     

@@ -21,7 +21,7 @@ end
 
 function TimeDisplay:draw(ass)
     local icon_y = self.state.h - self.opts.controls_y_offset
-    local margin_right = 20
+    local margin_right = 80  -- space for WindowControls buttons
     
     ass:new_event()
     ass:pos(self.state.w - margin_right, icon_y)
