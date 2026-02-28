@@ -20,13 +20,12 @@ local function timestamp(seconds)
 end
 
 function TimeDisplay:draw(ass)
-    -- Fila inferior, alineado a la derecha
-    local icon_y = self.state.h - self.opts.controls_row_offset
-    local margin_right = self.opts.time_margin_right
+    local icon_y = self.state.h - self.opts.controls_y_offset
+    local margin_right = 20
     
     ass:new_event()
     ass:pos(self.state.w - margin_right, icon_y)
-    ass:an(6)  -- Alinear a la derecha (anchor point: right-center)
+    ass:an(6)
     ass:append(string.format("{\\fs%d\\bord1\\shad0\\1c&HFFFFFF&\\3c&H000000&}", self.opts.font_size))
     
     local time_to_show = self.state.position

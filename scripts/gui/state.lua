@@ -10,15 +10,20 @@ local state = {
     position = 0,
     paused = false,
     user_activity = false,
-    has_file = false, -- Si hay un archivo cargado
+    has_file = false,
     
-    -- LÓGICA MODERN.LUA: Variable para evitar comandos repetidos
-    last_seek_pct = -1,
-    visual_seek_pct = -1, -- Para visualización suave durante el arrastre
+    -- Active element locking (mpv-osc-modern pattern)
+    active_element = nil,
     
-    -- Control de window-dragging
-    control_area_active = false, -- Si el mouse está actualmente en el área de controles
-    bg_dragging = false -- Si hubo un click down en el background
+    -- Volume
+    volume = 100,
+    muted = false,
+    
+    -- Visual seek during drag
+    visual_seek_pct = -1,
+    
+    -- Window-dragging control
+    control_area_active = false,
 }
 
 return state

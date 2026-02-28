@@ -10,15 +10,12 @@ end
 
 function PlayButton:handle_input(event, x, y)
     if event == "down" then
-        -- Hitbox específico para el botón Play/Pause (centrado)
-        local icon_y = self.state.h - self.opts.controls_row_offset
-        local icon_x = self.state.w / 2  -- Centrado
-        local hitbox_radius = 30
-        
-        -- Verificar que estamos en el área del control box (Y)
+        local icon_y = self.state.h - self.opts.controls_y_offset
+        local icon_x = self.state.w / 2
+        local hitbox = 25
         local box_top = self.state.h - self.opts.box_height
         
-        if y >= box_top and math.abs(x - icon_x) < hitbox_radius and math.abs(y - icon_y) < hitbox_radius then
+        if y >= box_top and math.abs(x - icon_x) < hitbox and math.abs(y - icon_y) < hitbox then
             mp.command("cycle pause")
             return true
         end
@@ -27,24 +24,21 @@ function PlayButton:handle_input(event, x, y)
 end
 
 function PlayButton:draw(ass)
-    -- Fila inferior para controles, centrado horizontalmente
-    local icon_y = self.state.h - self.opts.controls_row_offset
-    local cur_x = self.state.w / 2  -- Centrado
+    local icon_y = self.state.h - self.opts.controls_y_offset
+    local cur_x = self.state.w / 2
     
     ass:new_event()
     ass:pos(cur_x, icon_y)
-    ass:an(5) -- Anchor center
+    ass:an(5)
     ass:append("{\\bord0\\shad0\\c&HFFFFFF&}")
     ass:draw_start()
     if self.state.paused then
-        -- Triángulo de play centrado
-        ass:move_to(-8, -12)
-        ass:line_to(12, 0)
-        ass:line_to(-8, 12)
+        ass:move_to(-7, -10)
+        ass:line_to(10, 0)
+        ass:line_to(-7, 10)
     else
-        -- Pause centrado
-        ass:rect_cw(-8, -10, -3, 10)
-        ass:rect_cw(3, -10, 8, 10)
+        ass:rect_cw(-7, -8, -3, 8)
+        ass:rect_cw(3, -8, 7, 8)
     end
     ass:draw_stop()
 end

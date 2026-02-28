@@ -5,23 +5,19 @@ ProgressBar.__index = ProgressBar
 
 function ProgressBar.new(state, opts)
     local self = Element.new(state, opts)
+    self.last_seek = nil
     return setmetatable(self, ProgressBar)
 end
 
 function ProgressBar:is_hovering(x, y)
-    -- La barra está en la fila superior (bar_row_offset desde abajo)
-    local bar_visual_y = self.state.h - self.opts.bar_row_offset
-    local margin = self.opts.bar_hover_margin or 30
-    
-    -- Verificar que X está dentro del área de la barra
+    local bar_y = self.state.h - self.opts.bar_y_offset
+    local margin = self.opts.bar_hover_margin
     local bar_start = self.opts.bar_margin_left
     local bar_end = self.state.w - self.opts.bar_margin_right
-    local in_x_range = (x >= bar_start - 10) and (x <= bar_end + 10)
     
-    -- Área sensible vertical: ±margin píxeles alrededor de la barra
-    local in_y_range = (y >= bar_visual_y - margin) and (y <= bar_visual_y + margin)
-    
-    return in_x_range and in_y_range
+    local in_x = (x >= bar_start - 10) and (x <= bar_end + 10)
+    local in_y = (y >= bar_y - margin) and (y <= bar_y + margin)
+    return in_x and in_y
 end
 
 function ProgressBar:get_seek_percentage(x)
@@ -33,31 +29,41 @@ function ProgressBar:get_seek_percentage(x)
 end
 
 function ProgressBar:handle_input(event, x, y)
-    -- Update hovering state for draw
-    local hovering = self:is_hovering(x, y)
-    self.state.hovering_bar = hovering
-
     if event == "down" then
-        if hovering then
+        if self:is_hovering(x, y) then
+            -- Lock: start drag and seek immediately (mpv-osc-modern pattern)
             self.state.dragging = true
-            mp.set_property("window-dragging", "no")
-            self.state.visual_seek_pct = self:get_seek_percentage(x)
+            self.state.hovering_bar = true
+            local pct = self:get_seek_percentage(x)
+            self.state.visual_seek_pct = pct
+            -- Seek immediately on click
+            mp.commandv("seek", pct * 100, "absolute-percent+exact")
+            self.last_seek = pct
             return true
         end
+        
     elseif event == "move" then
         if self.state.dragging then
-            mp.set_property("window-dragging", "no")
-            self.state.visual_seek_pct = self:get_seek_percentage(x)
+            -- During drag: always update, regardless of hover position
+            -- (active-element locking — mouse can go anywhere)
+            local pct = self:get_seek_percentage(x)
+            self.state.visual_seek_pct = pct
+            -- Seek while dragging (deduplicate identical seeks)
+            if self.last_seek == nil or math.abs(pct - self.last_seek) > 0.001 then
+                mp.commandv("seek", pct * 100, "absolute-percent+exact")
+                self.last_seek = pct
+            end
             return true
+        else
+            -- Not dragging: just update hover state
+            self.state.hovering_bar = self:is_hovering(x, y)
         end
+        
     elseif event == "up" then
         if self.state.dragging then
-            if self.state.visual_seek_pct >= 0 then
-                mp.commandv("seek", self.state.visual_seek_pct * 100, "absolute-percent+exact")
-            end
             self.state.dragging = false
             self.state.visual_seek_pct = -1
-            mp.set_property("window-dragging", "yes")
+            self.last_seek = nil
             return true
         end
     end
@@ -74,46 +80,43 @@ function ProgressBar:draw(ass)
     local bar_width = bar_end - bar_start
     
     local bar_h = (state.hovering_bar or state.dragging) and opts.bar_hover_height or opts.bar_height
-    -- Fila superior para la barra
-    local bar_y_pos = h - opts.bar_row_offset
+    local bar_y = h - opts.bar_y_offset
     
     local progress = 0
-    -- Prioridad a la visualización del arrastre sobre la posición real
     if state.visual_seek_pct and state.visual_seek_pct >= 0 then
         progress = state.visual_seek_pct
     elseif state.duration > 0 then
         progress = state.position / state.duration
     end
     
-    -- Background Bar (con bordes redondeados)
+    -- Background track
     ass:new_event()
     ass:append(string.format("{\\bord0\\shad0\\c&H%s&\\alpha&H%s&}", "FFFFFF", "BB"))
-    ass:pos(bar_start, bar_y_pos - bar_h/2)
+    ass:pos(bar_start, bar_y - bar_h/2)
     ass:draw_start()
     ass:round_rect_cw(0, 0, bar_width, bar_h, bar_h/2)
     ass:draw_stop()
     
-    -- Progress Bar
+    -- Played portion
     if progress > 0 then
         ass:new_event()
         ass:append(string.format("{\\bord0\\shad0\\c&H%s&\\alpha&H00&}", opts.color_played))
-        ass:pos(bar_start, bar_y_pos - bar_h/2)
+        ass:pos(bar_start, bar_y - bar_h/2)
         ass:draw_start()
         ass:round_rect_cw(0, 0, bar_width * progress, bar_h, bar_h/2)
         ass:draw_stop()
         
-        -- Handle (Círculo perfecto)
-        if state.hovering_bar or state.dragging or (state.visual_seek_pct and state.visual_seek_pct >= 0) then
+        -- Handle circle (visible on hover/drag)
+        if state.hovering_bar or state.dragging then
            local r = opts.handle_size / 2
            local cx = bar_start + bar_width * progress
-           local cy = bar_y_pos
+           local cy = bar_y
            
            ass:new_event()
            ass:append(string.format("{\\bord0\\shad0\\c&H%s&}", opts.color_played))
            ass:pos(cx, cy)
            ass:draw_start()
-           -- Círculo perfecto usando bezier curves
-           local k = 0.5522847498  -- Constante para aproximar círculo con bezier
+           local k = 0.5522847498
            ass:move_to(0, -r)
            ass:bezier_curve(r*k, -r, r, -r*k, r, 0)
            ass:bezier_curve(r, r*k, r*k, r, 0, r)
