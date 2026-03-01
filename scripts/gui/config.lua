@@ -7,7 +7,7 @@ local opts = {
     bar_height = 4,
     bar_hover_height = 8,
     handle_size = 16,
-    color_played = "0000FF",  -- Red in BGR
+    color_played = "0000FF",
     
     -- Layout
     box_height = 120,
@@ -19,9 +19,8 @@ local opts = {
     bar_margin_left = 20,
     bar_margin_right = 20,
     
-    -- Styles
-    color_bg = "FFFFFF",
-    opacity_bg = "CC",
+    -- Font (use a clean sans-serif that exists on Windows)
+    font = "Segoe UI",
     font_size = 16,
     
     -- Behavior
@@ -34,13 +33,12 @@ local opts = {
     volume_slider_width = 80,
     
     -- Subtitles
-    subtitle_font_size = 16,
+    subtitle_font_size = 24,
     
     -- Window controls
     show_window_controls = true,
 }
 
--- Read user overrides from script-opts/custom_osc.conf
 mp_options.read_options(opts, "custom_osc")
 
 return opts

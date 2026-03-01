@@ -1,4 +1,4 @@
-local mp = require 'mp'
+local mp = require 'mp' 
 local Element = require 'elements.Element'
 local Subs = setmetatable({}, {__index = Element})
 Subs.__index = Subs
@@ -10,8 +10,8 @@ function Subs.new(state, opts)
     self.show_menu = false
     self.sub_tracks = {}
     self.current_sub = 0
-    self.scroll_offset = 0    -- scroll position for long lists
-    self.max_visible = 8      -- max subtitle items visible at once
+    self.scroll_offset = 0
+    self.max_visible = 8
     return setmetatable(self, Subs)
 end
 
@@ -33,12 +33,10 @@ function Subs:update_tracks()
             if t.selected then self.current_sub = t.id end
         end
     end
-    -- Clamp scroll
     local max_off = math.max(0, #self.sub_tracks - self.max_visible)
     self.scroll_offset = math.max(0, math.min(self.scroll_offset, max_off))
 end
 
--- ── Layout constants ──
 function Subs:_btn_pos()
     local cy = self.state.h - self.opts.controls_y_offset
     local bx = self.state.w / 2 - 130
@@ -47,42 +45,42 @@ end
 
 function Subs:_menu_geo()
     local bx, cy = self:_btn_pos()
-    local fs = self.opts.subtitle_font_size + 4  -- ensure readable
-    local item_h = fs + 16
-    local pad = 14
-    local menu_w = 320
+    local fs = self.opts.subtitle_font_size
+    local item_h = fs + 18
+    local pad = 16
+    local menu_w = 340
     local visible = math.min(#self.sub_tracks, self.max_visible)
-    local menu_h = (visible + 1) * item_h + pad * 2  -- +1 for "Off" row
+    local menu_h = (visible + 1) * item_h + pad * 2
     local menu_x = bx
-    local menu_y = cy - BTN_H / 2 - menu_h - 10
+    local menu_y = cy - BTN_H / 2 - menu_h - 12
     return menu_x, menu_y, menu_w, menu_h, item_h, pad, fs
 end
 
--- ── Draw ──
 function Subs:draw(ass)
     local bx, cy = self:_btn_pos()
     self:update_tracks()
     local active = self.current_sub > 0
+    local font = self.opts.font
 
-    -- CC button bg
+    -- CC button background (centered at cy)
     ass:new_event()
-    ass:pos(bx, cy - BTN_H / 2)
-    ass:an(7)
+    ass:pos(bx + BTN_W / 2, cy)
+    ass:an(5)
     ass:append("{\\bord1\\shad0\\3c&H444444&}")
     ass:append(active
         and "{\\1c&HFFFFFF&\\alpha&H50&}"
         or  "{\\1c&H333333&\\alpha&H40&}")
     ass:draw_start()
-    ass:round_rect_cw(0, 0, BTN_W, BTN_H, 4)
+    ass:round_rect_cw(-BTN_W/2, -BTN_H/2, BTN_W/2, BTN_H/2, 4)
     ass:draw_stop()
 
-    -- CC text
+    -- CC text (centered at cy)
     ass:new_event()
     ass:pos(bx + BTN_W / 2, cy)
     ass:an(5)
     ass:append(string.format(
-        "{\\fnSegoe UI Semibold\\fs14\\bord1\\shad0\\1c&H%s&\\3c&H000000&}",
-        active and "FFFFFF" or "AAAAAA"))
+        "{\\fn%s\\fsp1\\b1\\fs14\\bord1\\shad0\\1c&H%s&\\3c&H000000&}",
+        font, active and "FFFFFF" or "AAAAAA"))
     ass:append("CC")
 
     if self.show_menu then self:_draw_menu(ass) end
@@ -90,82 +88,84 @@ end
 
 function Subs:_draw_menu(ass)
     local mx, my, mw, mh, ih, pad, fs = self:_menu_geo()
-    local has_scroll = #self.sub_tracks > self.max_visible
+    local font = self.opts.font
 
     -- Dark background
     ass:new_event()
     ass:pos(mx, my)
     ass:an(7)
-    ass:append("{\\bord1\\shad3\\3c&H000000&\\4c&H000000&\\1c&H1A1A1A&\\alpha&H10&}")
+    ass:append("{\\bord1\\shad4\\3c&H000000&\\4c&H000000&\\1c&H1A1A1A&\\alpha&H08&}")
     ass:draw_start()
     ass:round_rect_cw(0, 0, mw, mh, 10)
     ass:draw_stop()
 
-    -- Row 0: "Off" / "Disabled"
-    local row_y = my + pad
+    -- "Disabled" row
+    local ry = my + pad + ih / 2
     local marker = self.current_sub == 0 and "●" or "○"
     local col    = self.current_sub == 0 and "44AAFF" or "DDDDDD"
     ass:new_event()
-    ass:pos(mx + pad, row_y + ih / 2)
+    ass:pos(mx + pad, ry)
     ass:an(4)
     ass:append(string.format(
-        "{\\fnSegoe UI\\fs%d\\bord1\\shad0\\1c&H%s&\\3c&H000000&}", fs, col))
+        "{\\fn%s\\fs%d\\bord1\\shad0\\1c&H%s&\\3c&H000000&}", font, fs, col))
     ass:append(marker .. "  Disabled")
 
     -- Separator
     ass:new_event()
-    ass:pos(mx + pad, row_y + ih)
+    ass:pos(mx + pad, my + pad + ih)
     ass:an(7)
     ass:append("{\\bord0\\shad0\\c&H444444&}")
     ass:draw_start()
     ass:rect_cw(0, 0, mw - pad * 2, 1)
     ass:draw_stop()
 
-    -- Subtitle rows (scrollable window)
+    -- Subtitle rows (scrolled window)
     local vis_start = self.scroll_offset + 1
     local vis_end   = math.min(#self.sub_tracks, self.scroll_offset + self.max_visible)
 
     for vi = vis_start, vis_end do
         local t = self.sub_tracks[vi]
         local idx = vi - vis_start + 1
-        local ry = my + pad + idx * ih
+        local item_y = my + pad + idx * ih + ih / 2
         marker = t.selected and "●" or "○"
         col    = t.selected and "44AAFF" or "DDDDDD"
         ass:new_event()
-        ass:pos(mx + pad, ry + ih / 2)
+        ass:pos(mx + pad, item_y)
         ass:an(4)
         ass:append(string.format(
-            "{\\fnSegoe UI\\fs%d\\bord1\\shad0\\1c&H%s&\\3c&H000000&}", fs, col))
-        ass:append(string.format("%s  %s", marker, t.label))
+            "{\\fn%s\\fs%d\\bord1\\shad0\\1c&H%s&\\3c&H000000&}", font, fs, col))
+        -- Truncate very long labels
+        local label = t.label
+        if #label > 40 then label = label:sub(1, 37) .. "..." end
+        ass:append(string.format("%s  %s", marker, label))
     end
 
     -- Scroll indicators
+    local has_scroll = #self.sub_tracks > self.max_visible
     if has_scroll then
         if self.scroll_offset > 0 then
             ass:new_event()
-            ass:pos(mx + mw - pad - 8, my + pad + ih / 2)
-            ass:an(5)
+            ass:pos(mx + mw - pad, my + pad + ih / 2)
+            ass:an(6)
             ass:append(string.format(
-                "{\\fnSegoe UI\\fs%d\\bord1\\shad0\\1c&H888888&\\3c&H000000&}", fs))
+                "{\\fn%s\\fs%d\\bord1\\shad0\\1c&H888888&\\3c&H000000&}", font, fs - 2))
             ass:append("▲")
         end
         if vis_end < #self.sub_tracks then
             ass:new_event()
-            ass:pos(mx + mw - pad - 8, my + mh - pad - ih / 2)
-            ass:an(5)
+            ass:pos(mx + mw - pad, my + mh - pad)
+            ass:an(6)
             ass:append(string.format(
-                "{\\fnSegoe UI\\fs%d\\bord1\\shad0\\1c&H888888&\\3c&H000000&}", fs))
+                "{\\fn%s\\fs%d\\bord1\\shad0\\1c&H888888&\\3c&H000000&}", font, fs - 2))
             ass:append("▼")
         end
     end
 end
 
--- ── Input ──
 function Subs:handle_input(event, x, y)
     local bx, cy = self:_btn_pos()
 
     if event == "down" then
-        -- CC button toggle
         if x >= bx - 8 and x <= bx + BTN_W + 8
            and y >= cy - BTN_H / 2 - 8 and y <= cy + BTN_H / 2 + 8 then
             self:update_tracks()
@@ -173,10 +173,8 @@ function Subs:handle_input(event, x, y)
             self.scroll_offset = 0
             return true
         end
-
         if self.show_menu then
             local mx, my, mw, mh, ih, pad = self:_menu_geo()
-            -- Inside menu?
             if x >= mx and x <= mx + mw and y >= my and y <= my + mh then
                 local ry = y - my - pad
                 local idx = math.floor(ry / ih)
@@ -203,7 +201,6 @@ function Subs:handle_input(event, x, y)
             self.scroll_offset = self.scroll_offset - 1
             return true
         end
-
     elseif event == "scroll_down" then
         if self.show_menu then
             local max_off = math.max(0, #self.sub_tracks - self.max_visible)
@@ -213,7 +210,6 @@ function Subs:handle_input(event, x, y)
             end
         end
     end
-
     return false
 end
 

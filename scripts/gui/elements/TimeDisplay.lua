@@ -20,20 +20,20 @@ local function timestamp(seconds)
 end
 
 function TimeDisplay:draw(ass)
-    local icon_y = self.state.h - self.opts.controls_y_offset
-    local margin_right = 80  -- space for WindowControls buttons
-    
+    local cy = self.state.h - self.opts.controls_y_offset
+
     ass:new_event()
-    ass:pos(self.state.w - margin_right, icon_y)
-    ass:an(6)
-    ass:append(string.format("{\\fs%d\\bord1\\shad0\\1c&HFFFFFF&\\3c&H000000&}", self.opts.font_size))
-    
-    local time_to_show = self.state.position
+    ass:pos(self.state.w - 85, cy)
+    ass:an(6)  -- middle-right anchor → vertically centered at cy
+    ass:append(string.format(
+        "{\\fn%s\\fs%d\\bord1\\shad0\\1c&HFFFFFF&\\3c&H000000&}",
+        self.opts.font, self.opts.font_size))
+
+    local t = self.state.position
     if self.state.visual_seek_pct and self.state.visual_seek_pct >= 0 then
-        time_to_show = self.state.visual_seek_pct * self.state.duration
+        t = self.state.visual_seek_pct * self.state.duration
     end
-    
-    ass:append(timestamp(time_to_show) .. " / " .. timestamp(self.state.duration))
+    ass:append(timestamp(t) .. " / " .. timestamp(self.state.duration))
 end
 
 return TimeDisplay
