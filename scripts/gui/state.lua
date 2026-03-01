@@ -1,5 +1,9 @@
 local state = {
+    -- Virtual resolution (set by main.lua)
     w = 0, h = 0,
+    -- Physical window size (for mouse coord translation)
+    real_w = 0, real_h = 0,
+    
     mouse_x = 0, mouse_y = 0,
     hovering_bar = false,
     dragging = false,

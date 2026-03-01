@@ -12,8 +12,8 @@ function PlayButton:handle_input(event, x, y)
     if event == "down" then
         local cy = self.state.h - self.opts.controls_y_offset
         local cx = self.state.w / 2
-        local box_top = self.state.h - self.opts.box_height
-        if y >= box_top and math.abs(x - cx) < 25 and math.abs(y - cy) < 25 then
+        if y >= self.state.h - self.opts.box_height
+           and math.abs(x - cx) < 25 and math.abs(y - cy) < 25 then
             mp.command("cycle pause")
             return true
         end
@@ -26,19 +26,19 @@ function PlayButton:draw(ass)
     local cx = self.state.w / 2
 
     ass:new_event()
-    ass:pos(cx, cy)
-    ass:an(5)
+    ass:pos(0, 0)
+    ass:an(7)
     ass:append("{\\bord0\\shad0\\c&HFFFFFF&}")
     ass:draw_start()
     if self.state.paused then
-        -- Solid Play triangle
-        ass:move_to(-7, -10)
-        ass:line_to(11, 0)
-        ass:line_to(-7, 10)
+        -- Play triangle (absolute coords centered on cx, cy)
+        ass:move_to(cx - 7, cy - 10)
+        ass:line_to(cx + 11, cy)
+        ass:line_to(cx - 7, cy + 10)
     else
-        -- Solid Pause bars
-        ass:rect_cw(-8, -9, -3, 9)
-        ass:rect_cw(3, -9, 8, 9)
+        -- Pause bars
+        ass:rect_cw(cx - 8, cy - 9, cx - 3, cy + 9)
+        ass:rect_cw(cx + 3, cy - 9, cx + 8, cy + 9)
     end
     ass:draw_stop()
 end

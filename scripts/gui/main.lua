@@ -1,5 +1,5 @@
 -- 1. Setup Path (Portable)
-local script_path = debug.getinfo(1).source:match("@(.*[\\/])")
+local script_path = debug.getinfo(1).source:match("@(.+[\\/])")
 package.path = script_path .. "?.lua;" .. package.path
 
 local mp = require 'mp'
@@ -44,20 +44,43 @@ local ui_overlay = mp.create_osd_overlay("ass-events")
 ui_overlay.z = 20
 
 -- ============================================================================
--- RENDER
+-- VIRTUAL RESOLUTION (mpv-osc-modern pattern)
 -- ============================================================================
+-- Instead of mapping 1:1 to physical pixels, we use a virtual 720p canvas.
+-- This makes all element sizes resolution-independent: a 20px font is always
+-- the same fraction of the screen, whether on 720p, 1080p, 2K, or 4K.
 
-local bg_visible = false
+local function update_virtual_res()
+    if state.real_w <= 0 or state.real_h <= 0 then return end
+    local base_y = opts.base_res_y / opts.scale
+    local aspect = state.real_w / state.real_h
+    state.h = base_y
+    state.w = base_y * aspect
+end
 
-local function sync_res(ov)
+local function sync_overlay(ov)
     if state.w > 0 and state.h > 0 then
         ov.res_x = state.w
         ov.res_y = state.h
     end
 end
 
+-- Translate physical mouse coords → virtual coords
+local function mouse_to_virtual(px, py)
+    if state.real_w <= 0 or state.real_h <= 0 then return px, py end
+    local sx = state.w / state.real_w
+    local sy = state.h / state.real_h
+    return px * sx, py * sy
+end
+
+-- ============================================================================
+-- RENDER
+-- ============================================================================
+
+local bg_visible = false
+
 local function render_bg()
-    sync_res(bg_overlay)
+    sync_overlay(bg_overlay)
     if not state.has_file then
         bg_overlay.data = ""
         bg_overlay:update()
@@ -79,7 +102,7 @@ local function render_bg()
 end
 
 local function render_ui()
-    sync_res(ui_overlay)
+    sync_overlay(ui_overlay)
     if not state.has_file then
         local ass = assdraw.ass_new()
         dropzone:draw(ass)
@@ -108,19 +131,17 @@ end
 -- ============================================================================
 
 local function input_handler()
-    local x, y = mp.get_mouse_pos()
+    local px, py = mp.get_mouse_pos()
+    local x, y = mouse_to_virtual(px, py)
     state.mouse_x = x
     state.mouse_y = y
     state.user_activity = true
     
-    -- Background always handles window-dragging
     bg_elements[1]:handle_input("move", x, y)
     
-    -- If an element is locked (active during drag), dispatch ONLY to it
     if state.active_element then
         state.active_element:handle_input("move", x, y)
     else
-        -- Normal hover: dispatch to all (top-first)
         for i = #ui_elements, 1, -1 do
             if ui_elements[i]:handle_input("move", x, y) then
                 break
@@ -132,24 +153,21 @@ local function input_handler()
 end
 
 local function mouse_handler(tbl)
-    local x, y = mp.get_mouse_pos()
+    local px, py = mp.get_mouse_pos()
+    local x, y = mouse_to_virtual(px, py)
     state.mouse_x = x
     state.mouse_y = y
     
     local event = tbl.event
     
     if event == "down" then
-        -- Find which element was clicked (top-first)
-        -- Try UI elements first
         for i = #ui_elements, 1, -1 do
             if ui_elements[i]:handle_input("down", x, y) then
-                -- Lock onto this element for the duration of the drag
                 state.active_element = ui_elements[i]
                 render_ui()
                 return
             end
         end
-        -- Then try DropZone
         if dropzone:handle_input("down", x, y) then
             state.active_element = dropzone
             render_ui()
@@ -157,12 +175,10 @@ local function mouse_handler(tbl)
         end
         
     elseif event == "up" then
-        -- Dispatch up to the locked element
         if state.active_element then
             state.active_element:handle_input("up", x, y)
             state.active_element = nil
         end
-        -- Restore window-dragging if needed
         if not state.dragging then
             local box_top = state.h - opts.box_height
             if y < box_top and state.control_area_active then
@@ -224,7 +240,7 @@ mp.add_periodic_timer(0.25, function()
             state.show_ui = true
             render()
         end
-    elseif (now - state.last_mouse_move > opts.auto_hide_timeout) 
+    elseif (now - state.last_mouse_move > opts.auto_hide_timeout)
            and not state.hovering_bar and not state.paused and not state.dragging then
         if state.show_ui then
             state.show_ui = false
@@ -234,13 +250,14 @@ mp.add_periodic_timer(0.25, function()
 end)
 
 -- ============================================================================
--- WINDOW RESIZE
+-- WINDOW RESIZE → update virtual resolution
 -- ============================================================================
 
 mp.observe_property("osd-dimensions", "native", function(_, val)
     if val then
-        state.w = val.w
-        state.h = val.h
+        state.real_w = val.w
+        state.real_h = val.h
+        update_virtual_res()
         render()
     end
 end)
@@ -257,14 +274,12 @@ mp.add_key_binding("mouse_move", "mouse_move", input_handler, {complex=true})
 -- ============================================================================
 
 local function wheel_handler(direction)
-    -- Try dispatching scroll to UI elements (Subs menu first)
     for i = #ui_elements, 1, -1 do
         if ui_elements[i]:handle_input(direction, state.mouse_x, state.mouse_y) then
             render_ui()
             return
         end
     end
-    -- No element consumed it → volume control
     if opts.mouse_wheel_volume then
         if direction == "scroll_up" then
             mp.command(string.format("no-osd add volume %d", opts.volume_step))

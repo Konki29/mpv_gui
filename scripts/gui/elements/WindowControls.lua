@@ -18,12 +18,10 @@ function WindowControls:handle_input(event, x, y)
     if y < self.state.h - self.opts.box_height then return false end
     local w = self.state.w
 
-    -- Fullscreen (rightmost)
     if math.abs(x - (w - 25)) < HITBOX and math.abs(y - cy) < HITBOX then
         mp.commandv("cycle", "fullscreen")
         return true
     end
-    -- Minimize
     if math.abs(x - (w - 25 - BTN_GAP)) < HITBOX and math.abs(y - cy) < HITBOX then
         mp.commandv("cycle", "window-minimized")
         return true
@@ -35,45 +33,45 @@ function WindowControls:draw(ass)
     if not self.opts.show_window_controls then return end
     local cy = self.state.h - self.opts.controls_y_offset
     local w = self.state.w
+    local s = 7
+    local t = 2
 
-    -- Fullscreen icon (all drawn centered at cy with an(5))
+    -- Fullscreen icon (absolute coords)
     local fs_x = w - 25
     local is_fs = mp.get_property_bool("fullscreen", false)
 
     ass:new_event()
-    ass:pos(fs_x, cy)
-    ass:an(5)
+    ass:pos(0, 0)
+    ass:an(7)
     ass:append("{\\bord1\\shad0\\1c&HFFFFFF&\\3c&H000000&}")
     ass:draw_start()
-    local s = 7
-    local t = 2
     if is_fs then
-        -- Shrink corners
-        ass:rect_cw(-s, -s, -s + 4, -s + t)
-        ass:rect_cw(-s, -s, -s + t, -s + 4)
-        ass:rect_cw(s - 4, s - t, s, s)
-        ass:rect_cw(s - t, s - 4, s, s)
+        -- Shrink icon
+        ass:rect_cw(fs_x - s, cy - s, fs_x - s + 4, cy - s + t)
+        ass:rect_cw(fs_x - s, cy - s, fs_x - s + t, cy - s + 4)
+        ass:rect_cw(fs_x + s - 4, cy + s - t, fs_x + s, cy + s)
+        ass:rect_cw(fs_x + s - t, cy + s - 4, fs_x + s, cy + s)
     else
         -- Expand corners
-        ass:rect_cw(-s, -s, -s + 4, -s + t)
-        ass:rect_cw(-s, -s, -s + t, -s + 4)
-        ass:rect_cw(s - 4, -s, s, -s + t)
-        ass:rect_cw(s - t, -s, s, -s + 4)
-        ass:rect_cw(-s, s - t, -s + 4, s)
-        ass:rect_cw(-s, s - 4, -s + t, s)
-        ass:rect_cw(s - 4, s - t, s, s)
-        ass:rect_cw(s - t, s - 4, s, s)
+        ass:rect_cw(fs_x - s, cy - s, fs_x - s + 4, cy - s + t)
+        ass:rect_cw(fs_x - s, cy - s, fs_x - s + t, cy - s + 4)
+        ass:rect_cw(fs_x + s - 4, cy - s, fs_x + s, cy - s + t)
+        ass:rect_cw(fs_x + s - t, cy - s, fs_x + s, cy - s + 4)
+        ass:rect_cw(fs_x - s, cy + s - t, fs_x - s + 4, cy + s)
+        ass:rect_cw(fs_x - s, cy + s - 4, fs_x - s + t, cy + s)
+        ass:rect_cw(fs_x + s - 4, cy + s - t, fs_x + s, cy + s)
+        ass:rect_cw(fs_x + s - t, cy + s - 4, fs_x + s, cy + s)
     end
     ass:draw_stop()
 
-    -- Minimize icon (centered at cy)
+    -- Minimize icon (absolute coords)
     local min_x = w - 25 - BTN_GAP
     ass:new_event()
-    ass:pos(min_x, cy)
-    ass:an(5)
+    ass:pos(0, 0)
+    ass:an(7)
     ass:append("{\\bord1\\shad0\\1c&HFFFFFF&\\3c&H000000&}")
     ass:draw_start()
-    ass:rect_cw(-7, -1, 7, 1)
+    ass:rect_cw(min_x - 7, cy - 1, min_x + 7, cy + 1)
     ass:draw_stop()
 end
 

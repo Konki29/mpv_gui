@@ -3,25 +3,27 @@ local mp_options = require 'mp.options'
 local opts = {
     scale = 1,
     
-    -- Progress bar
+    -- Virtual resolution base (like mpv-osc-modern)
+    base_res_y = 720,
+    
+    -- Progress bar (all values in virtual 720p pixels)
     bar_height = 4,
     bar_hover_height = 8,
-    handle_size = 16,
-    color_played = "0000FF",
+    handle_size = 14,
+    color_played = "FF0000",
     
-    -- Layout
-    box_height = 120,
-    bar_y_offset = 80,
+    -- Layout (virtual pixels)
+    box_height = 100,
+    bar_y_offset = 70,
     controls_y_offset = 30,
-    bar_hover_margin = 22,
+    bar_hover_margin = 20,
     
-    -- Horizontal margins
-    bar_margin_left = 20,
-    bar_margin_right = 20,
+    bar_margin_left = 25,
+    bar_margin_right = 25,
     
-    -- Font (use a clean sans-serif that exists on Windows)
+    -- Font
     font = "Segoe UI",
-    font_size = 16,
+    font_size = 18,
     
     -- Behavior
     mouse_wheel_volume = true,
@@ -29,11 +31,11 @@ local opts = {
     seek_step = 5,
     auto_hide_timeout = 2,
     
-    -- Volume slider
+    -- Volume slider (virtual pixels)
     volume_slider_width = 80,
     
     -- Subtitles
-    subtitle_font_size = 24,
+    subtitle_font_size = 20,
     
     -- Window controls
     show_window_controls = true,
