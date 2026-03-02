@@ -18,7 +18,7 @@ function Background:_build_cache()
     local pixel_step = 4
     local num_strips = math.floor(box_height / pixel_step)
     
-    local alpha_bottom = 0x20
+    local alpha_bottom = 0x10   -- More opaque at bottom for legibility on bright scenes
     local alpha_top = 0xFF
     
     local parts = {}

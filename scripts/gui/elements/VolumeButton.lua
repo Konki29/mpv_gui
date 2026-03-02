@@ -1,3 +1,6 @@
+-- ==========================================================================
+-- VolumeButton.lua — Speaker icon + auto-hide slider (YouTube-style)
+-- ==========================================================================
 local mp = require 'mp'
 local Element = require 'elements.Element'
 local VolumeButton = setmetatable({}, {__index = Element})
@@ -7,6 +10,9 @@ function VolumeButton.new(state, opts)
     local self = Element.new(state, opts)
     self.dragging_vol = false
     self.last_vol_seek = nil
+    self.slider_visible = false
+    self.hover_time = 0
+    self.hide_delay = 1.5  -- seconds after mouse leaves to hide slider
     return setmetatable(self, VolumeButton)
 end
 
@@ -23,24 +29,39 @@ function VolumeButton:_vol_from_x(x)
     return math.max(0, math.min(100, ((x - sx) / sw) * 100))
 end
 
+function VolumeButton:_in_speaker_zone(x, y)
+    local cy, spk_x = self:_layout()
+    return math.abs(x - spk_x) < 18 and math.abs(y - cy) < 18
+end
+
+function VolumeButton:_in_slider_zone(x, y)
+    local cy, _, slider_x, slider_w = self:_layout()
+    return x >= slider_x - 8 and x <= slider_x + slider_w + 30
+           and math.abs(y - cy) < 18
+end
+
 function VolumeButton:handle_input(event, x, y)
     local cy, spk_x, slider_x, slider_w = self:_layout()
     local box_top = self.state.h - self.opts.box_height
 
     if event == "down" then
         if y < box_top then return false end
-        if math.abs(x - spk_x) < 18 and math.abs(y - cy) < 18 then
+        -- Speaker icon click → toggle mute
+        if self:_in_speaker_zone(x, y) then
             mp.commandv("cycle", "mute")
+            self.slider_visible = true
+            self.hover_time = mp.get_time()
             return true
         end
-        if x >= slider_x - 8 and x <= slider_x + slider_w + 8
-           and math.abs(y - cy) < 18 then
+        -- Slider click → start volume drag
+        if self.slider_visible and self:_in_slider_zone(x, y) then
             self.dragging_vol = true
             local v = self:_vol_from_x(x)
             mp.command(string.format("no-osd set volume %d", math.floor(v)))
             self.last_vol_seek = v
             return true
         end
+
     elseif event == "move" then
         if self.dragging_vol then
             local v = self:_vol_from_x(x)
@@ -50,10 +71,20 @@ function VolumeButton:handle_input(event, x, y)
             end
             return true
         end
+        -- Auto-show: hover near speaker or slider area
+        if y >= box_top then
+            if self:_in_speaker_zone(x, y) or
+               (self.slider_visible and self:_in_slider_zone(x, y)) then
+                self.slider_visible = true
+                self.hover_time = mp.get_time()
+            end
+        end
+
     elseif event == "up" then
         if self.dragging_vol then
             self.dragging_vol = false
             self.last_vol_seek = nil
+            self.hover_time = mp.get_time()
             return true
         end
     end
@@ -83,20 +114,33 @@ function VolumeButton:draw(ass)
     local pct = vol / 100
     local font = self.opts.font
 
+    -- Auto-hide logic: check if slider should disappear
+    if self.slider_visible and not self.dragging_vol then
+        local elapsed = mp.get_time() - self.hover_time
+        if elapsed > self.hide_delay then
+            -- Check if mouse is still near
+            local mx, my = self.state.mouse_x, self.state.mouse_y
+            if not self:_in_speaker_zone(mx, my) and
+               not self:_in_slider_zone(mx, my) then
+                self.slider_visible = false
+            else
+                self.hover_time = mp.get_time()
+            end
+        end
+    end
+
     -- Color logic
     local ic = muted and "555555" or "FFFFFF"
     local fill_col = muted and "666666" or (self.dragging_vol and "FF8800" or "FFFFFF")
     local bg_col = "555555"
 
-    -- Speaker icon (absolute coords)
+    -- Speaker icon (always visible)
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
     ass:append(string.format("{\\bord0\\shad0\\c&H%s&}", ic))
     ass:draw_start()
-    -- Body
     ass:rect_cw(spk_x - 5, cy - 5, spk_x + 1, cy + 5)
-    -- Cone
     ass:move_to(spk_x + 1, cy - 5)
     ass:line_to(spk_x + 8, cy - 9)
     ass:line_to(spk_x + 8, cy + 9)
@@ -113,43 +157,47 @@ function VolumeButton:draw(ass)
         ass:append("✕")
     end
 
-    -- Slider track (absolute coords, perfectly centered on cy)
-    local th = 4
-    local y_top = cy - th / 2
-    local y_bot = cy + th / 2
-    ass:new_event()
-    ass:pos(0, 0)
-    ass:an(7)
-    ass:append(string.format("{\\bord0\\shad0\\c&H%s&}", bg_col))
-    ass:draw_start()
-    ass:round_rect_cw(slider_x, y_top, slider_x + slider_w, y_bot, th / 2)
-    ass:draw_stop()
+    -- Slider (only when visible or dragging)
+    if self.slider_visible or self.dragging_vol then
+        local th = 4
+        local y_top = cy - th / 2
+        local y_bot = cy + th / 2
 
-    -- Filled portion
-    local fw = slider_w * pct
-    if fw > 0 then
+        -- Track background
         ass:new_event()
         ass:pos(0, 0)
         ass:an(7)
-        ass:append(string.format("{\\bord0\\shad0\\c&H%s&}", fill_col))
+        ass:append(string.format("{\\bord0\\shad0\\c&H%s&}", bg_col))
         ass:draw_start()
-        ass:round_rect_cw(slider_x, y_top, slider_x + fw, y_bot, th / 2)
+        ass:round_rect_cw(slider_x, y_top, slider_x + slider_w, y_bot, th / 2)
         ass:draw_stop()
+
+        -- Filled portion
+        local fw = slider_w * pct
+        if fw > 0 then
+            ass:new_event()
+            ass:pos(0, 0)
+            ass:an(7)
+            ass:append(string.format("{\\bord0\\shad0\\c&H%s&}", fill_col))
+            ass:draw_start()
+            ass:round_rect_cw(slider_x, y_top, slider_x + fw, y_bot, th / 2)
+            ass:draw_stop()
+        end
+
+        -- Handle circle
+        local hx = slider_x + fw
+        local hr = self.dragging_vol and 7 or 5
+        draw_circle_abs(ass, hx, cy, hr, fill_col)
+
+        -- Volume percentage text
+        ass:new_event()
+        ass:pos(slider_x + slider_w + 12, cy)
+        ass:an(4)
+        ass:append(string.format(
+            "{\\fn%s\\fs13\\bord1\\shad0\\1c&H%s&\\3c&H000000&}",
+            font, muted and "555555" or "CCCCCC"))
+        ass:append(string.format("%d%%", math.floor(vol)))
     end
-
-    -- Handle circle (absolute)
-    local hx = slider_x + fw
-    local hr = self.dragging_vol and 7 or 5
-    draw_circle_abs(ass, hx, cy, hr, fill_col)
-
-    -- Volume percentage text
-    ass:new_event()
-    ass:pos(slider_x + slider_w + 12, cy)
-    ass:an(4)
-    ass:append(string.format(
-        "{\\fn%s\\fs13\\bord1\\shad0\\1c&H%s&\\3c&H000000&}",
-        font, muted and "555555" or "CCCCCC"))
-    ass:append(string.format("%d%%", math.floor(vol)))
 end
 
 return VolumeButton

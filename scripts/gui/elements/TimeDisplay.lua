@@ -41,7 +41,7 @@ function TimeDisplay:draw(ass)
     ass:pos(self.state.w - 90, cy)
     ass:an(6)
     ass:append(string.format(
-        "{\\fn%s\\fs%d\\bord1\\shad0\\1c&HFFFFFF&\\3c&H000000&}",
+        "{\\fn%s\\fs%d\\bord2\\shad1\\1c&HFFFFFF&\\3c&H000000&\\4c&H000000&}",
         self.opts.font, self.opts.font_size))
 
     local dur = self.state.duration or 0

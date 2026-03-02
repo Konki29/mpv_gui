@@ -1,16 +1,18 @@
 local mp = require 'mp'
 local Element = require 'elements.Element'
+local FilePicker = require 'utils.FilePicker'
 local DropZone = setmetatable({}, {__index = Element})
 DropZone.__index = DropZone
 
 function DropZone.new(state, opts)
     local self = Element.new(state, opts)
+    self.picker_open = false
     return setmetatable(self, DropZone)
 end
 
 function DropZone:draw(ass)
-    -- Solo mostrar si no hay archivo cargado
-    if self.state.has_file then
+    -- Solo mostrar si no hay archivo cargado y tenemos resolución
+    if self.state.has_file or self.state.w <= 0 or self.state.h <= 0 then
         return
     end
     
@@ -64,24 +66,25 @@ function DropZone:draw(ass)
     ass:line_to(play_cx - play_size * 0.4, play_cy - play_size * 0.6)
     ass:draw_stop()
     
-    -- Texto principal "Drop file here"
+    -- Texto principal
     ass:new_event()
     ass:append(string.format("{\\pos(%d,%d)\\an5\\r\\bord0\\shad0}", cx, cy + 30))
     ass:append("{\\fnSegoe UI\\fs24\\c&HFFFFFF&\\alpha&H20&}")
-    ass:append("Drop a file here to play")
-    
-    -- Texto secundario con teclas de acceso rápido
-    ass:new_event()
-    ass:append(string.format("{\\pos(%d,%d)\\an5\\r\\bord0\\shad0}", cx, cy + 65))
-    ass:append("{\\fnSegoe UI\\fs14\\c&H888888&\\alpha&H20&}")
-    ass:append("or press Ctrl+O to open")
+    ass:append("Click or drop a file here to play")
 end
 
 function DropZone:handle_input(event, x, y)
-    -- Si no hay archivo, podríamos abrir un diálogo al hacer click
     if not self.state.has_file and event == "down" then
-        -- Tu script actual parece no tener un file picker, pero podemos añadir la funcionalidad
-        -- Por ahora, solo consumimos el click para evitar comportamiento no deseado
+        if self.picker_open then
+            return true  -- already waiting for the dialog
+        end
+        self.picker_open = true
+        FilePicker.open(function(path)
+            self.picker_open = false
+            if path then
+                mp.commandv("loadfile", path)
+            end
+        end)
         return true
     end
     return false
