@@ -8,7 +8,7 @@ local opts = {
     
     -- Progress bar (all values in virtual 720p pixels)
     bar_height = 4,
-    bar_hover_height = 8,
+    bar_hover_height = 4,
     handle_size = 14,
     color_played = "FF0000",
     

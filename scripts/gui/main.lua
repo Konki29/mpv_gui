@@ -33,8 +33,10 @@ local function update_sub_margins()
 
     -- Horizontal shift calculation: Move to the right when menu opens (dodging menu on left)
     if state.subs_open then
-        mp.commandv("set", "sub-align-x", "left")
-        mp.commandv("set", "sub-margin-x", "380")
+        mp.commandv("set", "sub-align-x", "right")
+        -- By anchoring the subtitles to the right edge with a small 40px margin, 
+        -- we avoid applying symmetrical margins (which crushes the width) and completely dodge the left menu.
+        mp.commandv("set", "sub-margin-x", "60")
     else
         mp.commandv("set", "sub-align-x", tostring(original_sub_align_x))
         mp.commandv("set", "sub-margin-x", tostring(original_sub_margin_x))

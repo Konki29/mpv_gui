@@ -19,24 +19,25 @@ local BTN_W, BTN_H = 40, 26
 
 -- Spider-Verse palette (ASS = BGR order)
 local C = {
-    bg          = "0D0D0D",
-    bg_alpha    = "88",
-    border      = "000000",
-    cyan        = "FFFF00",
-    magenta     = "FF00FF",
-    yellow      = "00FFFF",
+    bg          = "0D0D0D", -- Negro azulado
+    bg_alpha    = "10",     -- Casi opaco pero con un toque elegante
+    border      = "FF0000", -- Borde negro puro
+    
+    halftone    = "333333", -- Puntos gris oscuro (sutiles)
+    
+    cyan        = "FFFF00", -- Cian
+    magenta     = "FF00FF", -- Magenta
+    yellow      = "00FFFF", -- Amarillo
     white       = "FFFFFF",
     grey        = "888888",
     dark_grey   = "444444",
     dim         = "555555",
-    active_glow = "FFFF00",
+    active_glow = "FF00FF", -- Magenta
     inactive    = "333333",
-    tab_active  = "FFFF00",
-    tab_text    = "000000",
-    selected    = "FFFF00",
-    halftone    = "222222",
+    tab_active  = "FFFFFF", -- Pestaña blanca
+    tab_text    = "000000", -- Texto pestaña negro
+    selected    = "00FFFF", -- Selección Amarilla
 }
-
 -- ══════════════════════════════════════════════════════════════════════════
 -- CONSTRUCTOR
 -- ══════════════════════════════════════════════════════════════════════════
@@ -153,26 +154,42 @@ function Subs:_menu_geo()
     local ih     = fs + 16
     local pad    = 14
     local tab_h  = fs + 12        -- compact tab bar
-    local menu_w = 360
 
     local tracks = self.active_tab == "subs" and self.sub_tracks or self.audio_tracks
-    local visible = math.min(#tracks, self.max_visible)
+    
+    -- Absolute maximum mathematical height allowed for the menu on screen
+    -- Accounting for the user's manual `- 50` margin they added
+    local max_h = cy - BTN_H / 2 - 20 - 50
+    local fixed_h = tab_h + pad * 2
+    if self.active_tab == "subs" then
+        fixed_h = fixed_h + ih * 2
+    else
+        fixed_h = fixed_h + ih
+    end
+    
+    -- Dynamically throttle the visible rows based on screen space so they don't bleed out of the box
+    local avail_rows = math.floor((max_h - fixed_h) / ih)
+    if avail_rows < 1 then avail_rows = 1 end
+    local current_max_vis = math.min(self.max_visible or 8, avail_rows)
+    self.dynamic_max_vis = current_max_vis -- Store globally so the draw loop respects the bounding box
+    
+    local visible = math.min(#tracks, current_max_vis)
     local content_rows = visible + 1
     if self.active_tab == "subs" then
         content_rows = content_rows + 1
     end
+    
     local menu_h = tab_h + content_rows * ih + pad * 2
     local menu_w = 340  -- Slightly narrower to look better right-aligned
 
     -- Anchor right edge of menu to right edge of CC button, grow leftward
     local menu_x = bx + BTN_W - menu_w
-    -- Clamp to left screen edge
     if menu_x < 4 then menu_x = 4 end
     
-    -- Avoid drawing negative geometry or overlapping the button
-    local max_h = cy - BTN_H / 2 - 20
+    -- Avoid drawing negative geometry
     if menu_h > max_h then menu_h = max_h end
     
+    -- The user manually requested hovering an extra 50px upwards
     local menu_y = cy - BTN_H / 2 - menu_h - 50
     return menu_x, menu_y, menu_w, menu_h, ih, pad, fs, tab_h
 end
@@ -182,6 +199,13 @@ end
 -- ══════════════════════════════════════════════════════════════════════════
 
 function Subs:draw(ass)
+    -- Invalidate cache if window dimensions change to prevent floating graphics
+    if self.last_w ~= self.state.w or self.last_h ~= self.state.h then
+        self.last_w = self.state.w
+        self.last_h = self.state.h
+        self.render_dirty = true
+    end
+
     -- Refresh track data only when dirty
     if self.tracks_dirty then
         self:update_tracks()
@@ -199,13 +223,37 @@ function Subs:draw(ass)
     ass:pos(0, 0)
     ass:an(7)
     if active then
+        -- Draw glowing border behind
         ass:append(string.format(
-            "{\\bord3\\shad0\\3c&H%s&\\1c&H%s&\\alpha&H40&}",
-            C.active_glow, C.bg))
+            "{\\bord0\\shad0\\1c&H%s&\\alpha&H40&}",
+            C.active_glow))
+        ass:draw_start()
+        ass:round_rect_cw(bx - 3, btn_top - 3, bx + BTN_W + 3, btn_top + BTN_H + 3, 5)
+        ass:draw_stop()
+        
+        -- Draw active background center
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append(string.format(
+            "{\\bord0\\shad0\\1c&H%s&\\alpha&H40&}",
+            C.bg))
     else
+        -- Draw dim border behind
         ass:append(string.format(
-            "{\\bord2\\shad0\\3c&H%s&\\1c&H%s&\\alpha&H60&}",
-            C.dim, C.inactive))
+            "{\\bord0\\shad0\\1c&H%s&\\alpha&H60&}",
+            C.dim))
+        ass:draw_start()
+        ass:round_rect_cw(bx - 2, btn_top - 2, bx + BTN_W + 2, btn_top + BTN_H + 2, 4)
+        ass:draw_stop()
+        
+        -- Draw inactive background center
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append(string.format(
+            "{\\bord0\\shad0\\1c&H%s&\\alpha&H60&}",
+            C.inactive))
     end
     ass:draw_start()
     ass:round_rect_cw(bx, btn_top, bx + BTN_W, btn_top + BTN_H, 3)
@@ -248,13 +296,24 @@ function Subs:_rebuild_menu_cache()
     local mx, my, mw, mh, ih, pad, fs, tab_h = self:_menu_geo()
     local font = self.opts.font
 
-    -- ── Panel background ──
+    -- ── Panel border (solid fill behind) ──
     a:new_event()
     a:pos(0, 0)
     a:an(7)
     a:append(string.format(
-        "{\\bord2\\shad0\\3c&H%s&\\1c&H%s&\\alpha&H%s&}",
-        C.border, C.bg, C.bg_alpha))
+        "{\\bord0\\shad0\\1c&H%s&\\alpha&H%s&}",
+        C.border, C.bg_alpha))
+    a:draw_start()
+    a:round_rect_cw(mx - 2, my - 2, mx + mw + 2, my + mh + 2, 7)
+    a:draw_stop()
+
+    -- ── Panel background (solid fill) ──
+    a:new_event()
+    a:pos(0, 0)
+    a:an(7)
+    a:append(string.format(
+        "{\\bord0\\shad0\\1c&H%s&\\alpha&H%s&}",
+        C.bg, C.bg_alpha))
     a:draw_start()
     a:round_rect_cw(mx, my, mx + mw, my + mh, 6)
     a:draw_stop()
@@ -295,7 +354,7 @@ end
 -- ══════════════════════════════════════════════════════════════════════════
 
 function Subs:_draw_halftone(ass, mx, my, mw, mh)
-    local key = tostring(math.floor(mw)) .. "x" .. tostring(math.floor(mh))
+    local key = string.format("%dx%d_at_%dx%d", math.floor(mw), math.floor(mh), math.floor(mx), math.floor(my))
     local cached = self.halftone_cache[key]
 
     if not cached then
@@ -305,13 +364,14 @@ function Subs:_draw_halftone(ass, mx, my, mw, mh)
         local cmds = {}
         for ry = 8, mh - 8, spacing do
             for cx = 8, mw - 8, spacing do
+                local px, py = mx + cx, my + ry
                 cmds[#cmds + 1] = string.format(
                     "m %d %d b %s %s %s %s %s %s b %s %s %s %s %s %s b %s %s %s %s %s %s b %s %s %s %s %s %s ",
-                    cx, ry - r,
-                    cx+r*k, ry-r,   cx+r, ry-r*k, cx+r, ry,
-                    cx+r, ry+r*k,   cx+r*k, ry+r, cx, ry+r,
-                    cx-r*k, ry+r,   cx-r, ry+r*k, cx-r, ry,
-                    cx-r, ry-r*k,   cx-r*k, ry-r, cx, ry-r
+                    px, py - r,
+                    px+r*k, py-r,   px+r, py-r*k, px+r, py,
+                    px+r, py+r*k,   px+r*k, py+r, px, py+r,
+                    px-r*k, py+r,   px-r, py+r*k, px-r, py,
+                    px-r, py-r*k,   px-r*k, py-r, px, py-r
                 )
             end
         end
@@ -320,9 +380,9 @@ function Subs:_draw_halftone(ass, mx, my, mw, mh)
     end
 
     ass:new_event()
-    ass:pos(mx, my)
+    ass:pos(0, 0)
     ass:an(7)
-    ass:append(string.format("{\\bord0\\shad0\\c&H%s&\\alpha&HE0&\\p1}", C.halftone))
+    ass:append(string.format("{\\bord0\\shad0\\c&H%s&\\alpha&H40&\\p1}", C.halftone))
     ass:append(cached)
     ass:append("{\\p0}")
 end
@@ -336,9 +396,21 @@ function Subs:_draw_tab(ass, tx, ty, tw, th, label, is_active, font, fs)
     ass:pos(0, 0)
     ass:an(7)
     if is_active then
+        -- Draw active tab border as a solid slightly larger box behind
         ass:append(string.format(
-            "{\\bord2\\shad0\\3c&H%s&\\1c&H%s&\\alpha&H00&}",
-            C.border, C.tab_active))
+            "{\\bord0\\shad0\\1c&H%s&\\alpha&H00&}",
+            C.border))
+        ass:draw_start()
+        ass:round_rect_cw(tx - 2, ty - 2, tx + tw + 2, ty + th + 2, 5)
+        ass:draw_stop()
+        
+        -- Draw active tab interior
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append(string.format(
+            "{\\bord0\\shad0\\1c&H%s&\\alpha&H00&}",
+            C.tab_active))
     else
         -- Subdued sketch style: very dim, transparent
         ass:append(string.format(
@@ -371,12 +443,13 @@ function Subs:_build_subs_content(ass, mx, top_y, mw, ih, pad, fs, font)
     local btn_w = 44
 
     -- Minus button
-    local minus_x = mx + pad
+    local center_x = mx + mw / 2
+    local minus_x = center_x - 60 - btn_w / 2
     self:_draw_comic_btn(ass, minus_x, ctrl_cy - ih/2 + 4, btn_w, ih - 8, "−", font, fs, C.magenta)
 
     -- Scale value
     ass:new_event()
-    ass:pos(mx + mw/2, ctrl_cy)
+    ass:pos(center_x, ctrl_cy)
     ass:an(5)
     ass:append(string.format(
         "{\\fn%s\\b1\\fs%d\\bord1\\shad0\\1c&H%s&\\3c&H%s&}",
@@ -384,7 +457,7 @@ function Subs:_build_subs_content(ass, mx, top_y, mw, ih, pad, fs, font)
     ass:append(string.format("%.1f", sub_scale))
 
     -- Plus button
-    local plus_x = mx + mw - pad - btn_w
+    local plus_x = center_x + 60 - btn_w / 2
     self:_draw_comic_btn(ass, plus_x, ctrl_cy - ih/2 + 4, btn_w, ih - 8, "+", font, fs, C.cyan)
 
     -- Separator
@@ -396,23 +469,28 @@ function Subs:_build_subs_content(ass, mx, top_y, mw, ih, pad, fs, font)
     ass:rect_cw(mx + pad, top_y + ih, mx + mw - pad, top_y + ih + 1)
     ass:draw_stop()
 
-    -- "Disabled" row
-    local dis_y = top_y + ih + ih / 2
-    self:_draw_track_row(ass, mx + pad, dis_y, mw - pad*2,
-                         "Disabled", self.current_sub == 0, font, fs)
-
     -- Visible subtitle rows
+    -- Index 1 is conceptually "Disabled", indices 2..N+1 are tracks
     local vis_start = self.scroll_offset + 1
-    local vis_end   = math.min(#self.sub_tracks, self.scroll_offset + self.max_visible)
+    local vis_end   = math.min(#self.sub_tracks + 1, self.scroll_offset + self.dynamic_max_vis)
+    
     for vi = vis_start, vis_end do
-        local t = self.sub_tracks[vi]
-        if t then
-            local row_idx = vi - vis_start + 2
-            local row_y = top_y + row_idx * ih + ih / 2
-            local label = t.label
-            if #label > 42 then label = label:sub(1, 39) .. "..." end
+        local row_idx = vi - vis_start + 1
+        local row_y = top_y + row_idx * ih + ih / 2
+        
+        if vi == 1 then
+            -- Draw Disabled row
             self:_draw_track_row(ass, mx + pad, row_y, mw - pad*2,
-                                 label, t.selected, font, fs)
+                                 "Disabled", self.current_sub == 0, font, fs)
+        else
+            -- Draw actual track
+            local t = self.sub_tracks[vi - 1]
+            if t then
+                local label = t.label
+                if #label > 42 then label = label:sub(1, 39) .. "..." end
+                self:_draw_track_row(ass, mx + pad, row_y, mw - pad*2,
+                                     label, t.selected, font, fs)
+            end
         end
     end
 end
@@ -450,7 +528,7 @@ function Subs:_build_audio_content(ass, mx, top_y, mw, ih, pad, fs, font)
     end
 
     local vis_start = self.scroll_offset_aud + 1
-    local vis_end   = math.min(#self.audio_tracks, self.scroll_offset_aud + self.max_visible)
+    local vis_end   = math.min(#self.audio_tracks, self.scroll_offset_aud + self.dynamic_max_vis)
     for vi = vis_start, vis_end do
         local t = self.audio_tracks[vi]
         if t then
@@ -473,8 +551,18 @@ function Subs:_draw_comic_btn(ass, bx, by, bw, bh, label, font, fs, accent)
     ass:pos(0, 0)
     ass:an(7)
     ass:append(string.format(
-        "{\\bord2\\shad0\\3c&H%s&\\1c&H%s&\\alpha&H80&}",
-        C.border, C.bg))
+        "{\\bord0\\shad0\\1c&H%s&\\alpha&H80&}",
+        C.border))
+    ass:draw_start()
+    ass:round_rect_cw(bx - 2, by - 2, bx + bw + 2, by + bh + 2, 4)
+    ass:draw_stop()
+    
+    ass:new_event()
+    ass:pos(0, 0)
+    ass:an(7)
+    ass:append(string.format(
+        "{\\bord0\\shad0\\1c&H%s&\\alpha&H80&}",
+        C.bg))
     ass:draw_start()
     ass:round_rect_cw(bx, by, bx + bw, by + bh, 3)
     ass:draw_stop()
@@ -507,8 +595,8 @@ function Subs:_draw_track_row(ass, rx, ry, rw, label, is_selected, font, fs)
     ass:pos(rx, ry)
     ass:an(4)
     ass:append(string.format(
-        "{\\fn%s\\fs%d\\bord2\\shad1\\1c&H%s&\\3c&H%s&\\4c&H000000&}",
-        font, fs, col, C.border))
+        "{\\fn%s\\fs%d\\bord0\\shad1\\1c&H%s&\\4c&H000000&}",
+        font, fs, col))
     ass:append(marker .. "  " .. label)
 end
 
@@ -601,13 +689,13 @@ function Subs:handle_input(event, x, y)
                     end
                 else
                     if self.active_tab == "subs" then
-                        local max_off = math.max(0, #self.sub_tracks - self.max_visible)
+                        local max_off = math.max(0, #self.sub_tracks - self.dynamic_max_vis)
                         if self.scroll_offset < max_off then
                             self.scroll_offset = self.scroll_offset + 1
                             self.render_dirty = true
                         end
                     else
-                        local max_off = math.max(0, #self.audio_tracks - self.max_visible)
+                        local max_off = math.max(0, #self.audio_tracks - self.dynamic_max_vis)
                         if self.scroll_offset_aud < max_off then
                             self.scroll_offset_aud = self.scroll_offset_aud + 1
                             self.render_dirty = true
@@ -630,10 +718,11 @@ function Subs:_handle_subs_click(mx, mw, ih, pad, idx, x)
     if idx == 0 then
         -- Sub-scale controls
         local btn_w = 44
-        local minus_left  = mx + pad
+        local center_x = mx + mw / 2
+        local minus_left  = center_x - 60 - btn_w / 2
         local minus_right = minus_left + btn_w
-        local plus_right  = mx + mw - pad
-        local plus_left   = plus_right - btn_w
+        local plus_left   = center_x + 60 - btn_w / 2
+        local plus_right  = plus_left + btn_w
 
         if x >= minus_left and x <= minus_right then
             local new_s = math.max(0.2, self.cached_sub_scale - 0.1)
@@ -643,31 +732,33 @@ function Subs:_handle_subs_click(mx, mw, ih, pad, idx, x)
             mp.commandv("set", "sub-scale", tostring(new_s))
         end
         return true
-
-    elseif idx == 1 then
-        -- Disabled
-        mp.commandv("set", "sid", "no")
-        self.current_sub = 0
-        self.show_menu = false
-        self.render_dirty = true
-        return true
-
     else
-        -- Track selection (strict bounds)
-        local drawn_idx = idx - 2
-        local max_drawn = math.min(#self.sub_tracks, self.max_visible) - 1
+        -- Track selection (integrated Disabled row at absolute index 0)
+        local drawn_idx = idx - 1
+        local max_drawn = math.min(#self.sub_tracks + 1, self.dynamic_max_vis) - 1
+        
         if drawn_idx >= 0 and drawn_idx <= max_drawn then
-            local real = drawn_idx + self.scroll_offset + 1
-            local track = self.sub_tracks[real]
-            if track then
-                mp.commandv("set", "sid", tostring(track.id))
-                self.current_sub = track.id
+            local absolute_idx = drawn_idx + self.scroll_offset
+            
+            if absolute_idx == 0 then
+                -- Disabled
+                mp.commandv("set", "sid", "no")
+                self.current_sub = 0
+            else
+                -- Actual Track
+                local track = self.sub_tracks[absolute_idx]
+                if track then
+                    mp.commandv("set", "sid", tostring(track.id))
+                    self.current_sub = track.id
+                end
             end
+            
             self.show_menu = false
             self.state.subs_open = false
             self.render_dirty = true
-            local base = self.saved_sub_margin or 22
-            mp.commandv("set", "sub-margin-y", tostring(base + 80))
+            if self.state.calculate_sub_margins then
+                self.state.calculate_sub_margins()
+            end
             return true
         end
         return true  -- Consume empty-space click
@@ -687,7 +778,7 @@ function Subs:_handle_audio_click(idx)
     end
 
     -- Strict bounds
-    local max_drawn = math.min(#self.audio_tracks, self.max_visible) - 1
+    local max_drawn = math.min(#self.audio_tracks, self.dynamic_max_vis) - 1
     if idx >= 0 and idx <= max_drawn then
         local real = idx + self.scroll_offset_aud + 1
         local track = self.audio_tracks[real]
@@ -704,8 +795,9 @@ function Subs:_handle_audio_click(idx)
         self.show_menu = false
         self.state.subs_open = false
         self.render_dirty = true
-        local base = self.saved_sub_margin or 22
-        mp.commandv("set", "sub-margin-y", tostring(base + 80))
+        if self.state.calculate_sub_margins then
+            self.state.calculate_sub_margins()
+        end
         return true
     end
 
